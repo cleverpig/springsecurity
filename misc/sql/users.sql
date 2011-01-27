@@ -1,0 +1,27 @@
+/*
+MySQL Data Transfer
+Source Host: localhost
+Source Database: demo
+Target Host: localhost
+Target Database: demo
+Date: 2011-1-13 14:59:26
+*/
+
+SET FOREIGN_KEY_CHECKS=0;
+-- ----------------------------
+-- Table structure for users
+-- ----------------------------
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL auto_increment,
+  `username` varchar(50) collate utf8_unicode_ci NOT NULL,
+  `password` varchar(50) collate utf8_unicode_ci NOT NULL,
+  `enabled` int(11) NOT NULL,
+  PRIMARY KEY  (`id`),
+  KEY `username` (`username`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+
+-- ----------------------------
+-- Records 
+-- ----------------------------
+INSERT INTO `users` VALUES ('1', 'admin', 'admin', '1');
+INSERT INTO `users` VALUES ('2', 'user', 'user', '1');

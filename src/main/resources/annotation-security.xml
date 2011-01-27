@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:security="http://www.springframework.org/schema/security"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/security
+       http://www.springframework.org/schema/security/spring-security.xsd">
+
+  <!--图片和css样式表不做安全考察-->
+  <security:http pattern="/**/*.jpg" security="none"/>
+  <security:http pattern="/**/*.css" security="none"/>
+
+  <security:http auto-config="false"
+                 use-expressions="true"
+                 access-denied-page="/access_denied.jsp"
+                 access-decision-manager-ref="httpAccessDecisionManager"
+                 entry-point-ref="loginUrlAuthenticationEntryPoint">
+    <!-- 定义URL访问列表-->
+    <!--<security:intercept-url pattern="/**/*.jpg" access="IS_AUTHENTICATED_ANONYMOUSLY"/>-->
+    <!--<security:intercept-url pattern="/**/*.css" access="IS_AUTHENTICATED_ANONYMOUSLY"/>-->
+    <!--<security:intercept-url pattern="/login.jsp" access="IS_AUTHENTICATED_ANONYMOUSLY" />-->
+    <!--<security:intercept-url pattern="/captcha.htm" access="IS_AUTHENTICATED_ANONYMOUSLY"/>-->
+    <!--<security:intercept-url pattern="/j_spring_security_check" access="IS_AUTHENTICATED_ANONYMOUSLY"/>-->
+    <!--<security:intercept-url pattern="/j_spring_security_logout" access="IS_AUTHENTICATED_ANONYMOUSLY"/>-->
+    <!--<security:intercept-url pattern="/admin.jsp" access="ROLE_ADMIN"/>-->
+    <!--<security:intercept-url pattern="/**" access="ROLE_USER"/>-->
+    <!-- 定义URL访问列表：使用EL表达式-->
+    <security:intercept-url pattern="/login.jsp" access="isAnonymous()" />
+    <security:intercept-url pattern="/captcha.htm" access="isAnonymous()"/>
+    <security:intercept-url pattern="/j_spring_security_check" access="isAnonymous()"/>
+    <security:intercept-url pattern="/j_spring_security_logout" access="isAnonymous()"/>
+    <security:intercept-url pattern="/admin.jsp" access="hasRole('PERM_ACCESS_ADMIN')"/>
+    <security:intercept-url pattern="/**" access="hasAnyRole('PERM_ACCESS_ADMIN','PERM_ACCESS_USER')"/>
+    <!--  使用自定义filter的话就不能使用这默认的form-login、logout-->
+    <!--
+        <security:form-login login-page="/login.jsp"
+                         authentication-failure-url="/login.jsp?error=true"
+                         default-target-url="/"/>
+        <security:logout logout-url="/index.jsp" logout-success-url="/login.jsp"/>
+         -->
+    <!--自定义filter-->
+    <security:custom-filter ref="authenticationFilter" position="FORM_LOGIN_FILTER" />
+    <security:custom-filter ref="logoutFilter" position="LOGOUT_FILTER"/>
+    <security:custom-filter ref="remeberMeFilter" position="REMEMBER_ME_FILTER"/>
+  </security:http>
+
+  <!--用户明细服务：用于从数据库中提取用户和授权信息-->
+  <!--<bean id="userDetailsService" class="com.bjinfotech.demo.service.MyUserDetailsService">-->
+    <!--<property name="dataSource" ref="datasource"/>-->
+  <!--</bean>-->
+
+  <!--授权管理器-->
+  <security:authentication-manager alias="authenticationManager">
+      <!--授权提供者：注意这里可用提供多个provider，系统将按照顺序依次尝试使用-->
+      <security:authentication-provider ref="daoAuthenticationProvider"/>
+  </security:authentication-manager>
+
+  <!--DAO授权提供者：使用了Ehcache对用户信息进行了缓存；
+  注意当用户修改信息（user,password等）后，要等cache过期后才能更新，或者使用手动更新-->
+  <bean id="daoAuthenticationProvider"
+    class="org.springframework.security.authentication.dao.DaoAuthenticationProvider">
+    <property name="userDetailsService" ref="userDetailsManager"/>
+    <property name="userCache" ref="userCache"/>
+  </bean>
+
+  <bean id="userDetailsManager" class="org.springframework.security.provisioning.JdbcUserDetailsManager">
+    <property name="dataSource" ref="datasource"/>
+    <property name="authenticationManager" ref="authenticationManager"/>
+    <property name="enableGroups" value="true"/>
+    <property name="enableAuthorities" value="false"/>
+  </bean>
+
+  <!--用户cache-->
+  <bean id="userCache" class="org.springframework.security.core.userdetails.cache.EhCacheBasedUserCache">
+    <property name="cache" ref="userEhCache"/>
+  </bean>
+
+  <!--cache：使用EhCacheFactoryBean factoryBean生产出来-->
+  <bean id="userEhCache" class="org.springframework.cache.ehcache.EhCacheFactoryBean">
+    <property name="cacheManager" ref="cacheManager"/>
+    <property name="cacheName" value="userCache"/>
+  </bean>
+
+  <!--cacheManager：使用EhCacheFactoryBean factoryBean生产出来-->
+  <bean id="cacheManager" class="org.springframework.cache.ehcache.EhCacheManagerFactoryBean"/>
+
+  <!--登录点：用于在未经授权访问的情况下，跳转到登录页面-->
+  <bean id="loginUrlAuthenticationEntryPoint"
+        class="org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint">
+        <property name="loginFormUrl" value="/login.jsp" />
+        <property name="forceHttps" value="false" />
+  </bean>
+
+  <!--验证码服务：这里使用factoryBean，因为需要唯一的instance，否则验证失败-->
+  <bean id="captchaService" class="com.bjinfotech.demo.service.CaptchaServiceFactoryBean">
+  </bean>
+
+  <!--带有验证码的认证filter-->
+  <bean id="authenticationFilter" class="com.bjinfotech.demo.filter.AuthenticationWithCaptchaFilter">
+    <property name="filterProcessesUrl" value="/j_spring_security_check"></property>
+    <property name="authenticationSuccessHandler" ref="loginAuthenticationSuccessHandler"/>
+    <property name="authenticationFailureHandler" ref="loginAuthenticationFailureHandler"/>
+    <property name="authenticationManager" ref="authenticationManager"/>
+    <property name="captchaService" ref="captchaService"/>
+    <property name="rememberMeServices" ref="rememberMeService"/>
+  </bean>
+
+  <!--登录成功handler-->
+  <bean id="loginAuthenticationSuccessHandler"
+    class="org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler">
+    <property name="defaultTargetUrl" value="/index.jsp"></property>
+  </bean>
+
+  <!--登录失败handler-->
+  <bean id="loginAuthenticationFailureHandler"
+    class="org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler">
+    <property name="defaultFailureUrl" value="/login.jsp?error=true"/>
+  </bean>
+
+  <!--登出filter-->
+  <bean id="logoutFilter" class="org.springframework.security.web.authentication.logout.LogoutFilter">
+    <constructor-arg index="0" ref="logutSuccessHandler"/>
+    <constructor-arg index="1">
+      <list>
+        <ref bean="contextLogoutHandler"></ref>
+      </list>
+    </constructor-arg>
+  </bean>
+
+  <!--登出handler：清除session、删除cookie-->
+  <bean id="contextLogoutHandler"
+    class="org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler">
+  </bean>
+
+  <!--登出成功handler-->
+  <bean id="logutSuccessHandler"
+    class="org.springframework.security.web.authentication.logout.SimpleUrlLogoutSuccessHandler">
+    <property name="defaultTargetUrl" value="/login.jsp"/>
+  </bean>
+
+  <!--remember-me服务：使用token将用户名、密码等值组成的字符串用key进行加密，存放到cookie-->
+  <bean id="rememberMeService" class="org.springframework.security.web.authentication.rememberme.TokenBasedRememberMeServices">
+    <property name="userDetailsService" ref="userDetailsManager"/>
+    <property name="key" value="haha"/>
+  </bean>
+
+  <!--remember-me filter：注意，springsecurity3的RememberMeAuthenticationFilter对chrome浏览器不起作用，即在chrome浏览器不能用remember me-->
+  <bean id="remeberMeFilter" class="org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter">
+    <property name="rememberMeServices" ref="rememberMeService"/>
+    <property name="authenticationManager" ref="authenticationManager"/>
+  </bean>
+
+  <bean id="httpAccessDecisionManager" class="org.springframework.security.access.vote.AffirmativeBased">
+    <property name="allowIfAllAbstainDecisions" value="false"/>
+    <property name="decisionVoters">
+      <list>
+        <ref bean="roleVoter"/>
+        <ref bean="authenticatedVoter"/>
+        <ref bean="webExpressionVoter"/>
+      </list>
+    </property>
+  </bean>
+
+  <bean id="webMethodExprHandler" class="org.springframework.security.web.access.expression.DefaultWebSecurityExpressionHandler"/>
+
+  <bean id="roleVoter" class="org.springframework.security.access.vote.RoleVoter">
+    <property name="rolePrefix" value="PERM_"/>
+   </bean>
+
+   <bean id="authenticatedVoter" class="org.springframework.security.access.vote.AuthenticatedVoter"/>
+
+   <bean id="webExpressionVoter" class="org.springframework.security.web.access.expression.WebExpressionVoter">
+     <property name="expressionHandler" ref="webMethodExprHandler"/>
+   </bean>
+
+  <!--打开安全annotation-->
+  <security:global-method-security
+      secured-annotations="enabled"
+      pre-post-annotations="enabled"/>
+  
+</beans>

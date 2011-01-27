@@ -1,0 +1,44 @@
+2011-01-09
+完成：
+	user、admin两种权限的URL判断
+	userDetailsService：基于数据库的用户信息、权限的读取
+	集成验证码：jcaptcha
+	自定义filter：captcha、remember-me、lougout
+	使用EhCache进行用户数据的缓存
+	基于bean方法的安全控制：WelcomeService
+	自定义jcaptcha的渲染引擎
+参考：
+  http://static.springsource.org/spring-security/site/docs/3.0.x/reference/
+  http://www.i-develop.be/blog/2010/02/04/spring-security-remember-me/
+  http://jcaptcha.octo.com/confluence/display/general/5+minutes+application+integration+tutorial
+
+2011-01-10
+增加：
+  jsp页面中的权限控制：使用springsecurity的taglib（authorize（授权）、anthentication（认证））
+  login.jsp页面中增加：刷新验证码
+
+2011-01-11
+修改：
+  使用用户组作为role、用户组授权为permission：
+    创建groups、group_authorities、group_members表。
+    修改daoAuthenticationProvider的userDetailsService为JdbcUserDetailsManager实现。
+
+  将经过测试的使用annotation的配置文件独立出来为annotation-security.xml。
+
+  尝试使用global-method-security配置protect-pointcut项替换写在class中的annotation，以便实现class的方法权限控制与class代码分离。
+参考：
+  http://greybeardedgeek.net/2008/08/spring-security-database-schema/
+
+2011-01-12
+完成：
+  使用global-method-security配置protect-pointcut项替换写在class中的annotation，以便实现class的方法权限控制与class代码分离。
+  定义messages_zh.properties，并配置messageSource bean，实现i18n。
+  在页面使用anthentication tag显示用户名
+参考：
+  spring security 3.1.0M2源代码
+  http://static.springsource.org/spring-security/site/docs/3.0.x/reference/
+  http://fei1502816.javaeye.com/blog/640441
+TODO：
+  实现与JSF的集成
+
+
